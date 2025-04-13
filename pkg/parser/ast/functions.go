@@ -372,6 +372,9 @@ const (
 	NextVal = "nextval"
 	LastVal = "lastval"
 	SetVal  = "setval"
+
+	// TiDB extension function.
+	Hello = "hello"
 )
 
 type FuncCallExprType int8

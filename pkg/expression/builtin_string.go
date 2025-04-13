@@ -84,6 +84,7 @@ var (
 	_ functionClass = &instrFunctionClass{}
 	_ functionClass = &loadFileFunctionClass{}
 	_ functionClass = &weightStringFunctionClass{}
+	_ functionClass = &helloFunctionClass{}
 )
 
 var (
@@ -153,6 +154,7 @@ var (
 	_ builtinFunc = &builtinFieldIntSig{}
 	_ builtinFunc = &builtinFieldStringSig{}
 	_ builtinFunc = &builtinWeightStringSig{}
+	_ builtinFunc = &builtinHelloSig{}
 )
 
 func reverseBytes(origin []byte) []byte {
@@ -4414,4 +4416,42 @@ func buildTranslateMap4Binary(from, to []byte) map[byte]uint16 {
 		mp[from[idx]] = uint16(to[idx])
 	}
 	return mp
+}
+
+// helloFunctionClass is the class for the hello function.
+type helloFunctionClass struct {
+        baseFunctionClass
+}
+
+// BuildContextインターフェースを使用するように修正
+// sessionctx.Context -> BuildContext
+func (c *helloFunctionClass) getFunction(ctx BuildContext, args []Expression) (builtinFunc, error) {
+        if err := c.verifyArgs(args); err != nil {
+                return nil, err
+        }
+        bf, err := newBaseBuiltinFuncWithTp(ctx, c.funcName, args, types.ETString, types.ETString)
+        if err != nil {
+                return nil, err
+        }
+        sig := &builtinHelloSig{bf}
+        return sig, nil
+}
+
+type builtinHelloSig struct {
+        baseBuiltinFunc
+}
+
+func (b *builtinHelloSig) Clone() builtinFunc {
+        newSig := &builtinHelloSig{}
+        newSig.cloneFrom(&b.baseBuiltinFunc)
+        return newSig
+}
+
+// EvalContextを引数に追加
+func (b *builtinHelloSig) evalString(ctx EvalContext, row chunk.Row) (string, bool, error) {
+        name, isNull, err := b.args[0].EvalString(ctx, row)
+        if isNull || err != nil {
+                return "", isNull, err
+        }
+        return "hello " + name, false, nil
 }
