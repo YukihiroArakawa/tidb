@@ -1092,6 +1092,16 @@ select @@last_plan_from_cache;
 set tidb_enable_non_prepared_plan_cache=DEFAULT;
 
 
+# TestIssue62606
+drop table if exists t0;
+CREATE TABLE t0(c0 BOOL PRIMARY KEY);
+INSERT INTO t0 VALUES (true), (false);
+SELECT count(*) FROM t0 WHERE 1 GROUP BY DATE_FORMAT(t0.c0, t0.c0);
+SET @b = 1;
+PREPARE prepare_query FROM 'SELECT count(*) FROM t0 WHERE ? GROUP BY DATE_FORMAT(t0.c0, t0.c0)';
+EXECUTE prepare_query USING @b;
+
+
 # TestNonPreparedPlanCacheExplain
 drop table if exists t;
 create table t(a int, index(a));
