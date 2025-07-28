@@ -51,20 +51,29 @@ var (
 
 // paramReplacer is an ast.Visitor that replaces all values with `?` and collects them.
 type paramReplacer struct {
-	params []*driver.ValueExpr
+	params    []*driver.ValueExpr
+	inGroupBy bool
 }
 
 func (pr *paramReplacer) Enter(in ast.Node) (out ast.Node, skipChildren bool) {
 	switch n := in.(type) {
-	case *ast.SelectField, *ast.GroupByClause, *ast.Limit, *ast.OrderByClause:
+	case *ast.SelectField, *ast.Limit, *ast.OrderByClause:
 		// Skip replacing values in these case:
 		// 1. SelectField: to keep the output field names be corresponding to these values.
-		// 2. GroupByClause, OrderByClause: to avoid breaking the full_group_by check.
+		// 2. OrderByClause: to avoid breaking the full_group_by check.
 		// 3. Limit: to generate different plans for queries with different limit values.
 		return in, true
+	case *ast.GroupByClause:
+		oldInGroupBy := pr.inGroupBy
+		pr.inGroupBy = true
+		defer func() { pr.inGroupBy = oldInGroupBy }()
+		return in, false
 	case *ast.FuncCallExpr:
 		switch n.FnName.L {
 		case ast.DateFormat, ast.StrToDate, ast.TimeFormat, ast.FromUnixTime:
+			if pr.inGroupBy {
+				return in, false
+			}
 			// skip the second format argument: date_format('2020', '%Y') --> date_format(?, '%Y')
 			ret, _ := n.Args[0].Accept(pr)
 			n.Args[0] = ret.(ast.ExprNode)
@@ -88,6 +97,7 @@ func (*paramReplacer) Leave(in ast.Node) (out ast.Node, ok bool) {
 
 func (pr *paramReplacer) Reset() {
 	pr.params = make([]*driver.ValueExpr, 0, 4)
+	pr.inGroupBy = false
 }
 
 // GetParamSQLFromAST returns the parameterized SQL of this AST.
